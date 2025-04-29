@@ -1,0 +1,13 @@
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - secret.yaml
+  - ingress.yaml
+  - Frontend/deployment.yaml
+  - Frontend/service.yaml
+  - Backend/deployment.yaml
+  - Backend/service.yaml
+  - Database/deployment.yaml
+  - Database/service.yaml
+  - Database/pvc.yaml
+  - Database/pv.yaml
