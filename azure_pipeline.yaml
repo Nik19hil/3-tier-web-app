@@ -1,0 +1,160 @@
+trigger:
+  branches:
+    include: ['none']
+
+pool:
+  name: 'Agent1'
+  demands:
+    - agent.name -equals agent1
+    - npm
+    - node.js
+    - kubectl
+    
+stages:
+  - stage: Build_and_Test
+    displayName: 'Maven Build and Test'
+    jobs:
+      - job: maven_compile
+        steps:
+          - task: Maven@4
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'compile'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+      - job: maven_test
+        steps:
+          - task: Maven@4
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'test'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+  
+  - stage: Maven_Package
+    displayName: 'Maven Package'
+    dependsOn: ['Build_and_Test']
+    jobs:
+      - job: maven_package
+        steps:
+          - task: Maven@4
+            inputs:
+              mavenPomFile: 'pom.xml'
+              goals: 'clean package'
+              options: '-X'
+              publishJUnitResults: true
+              testResultsFiles: '**/surefire-reports/TEST-*.xml'
+              javaHomeOption: 'JDKVersion'
+              mavenVersionOption: 'Default'
+              mavenAuthenticateFeed: false
+              effectivePomSkip: false
+              sonarQubeRunAnalysis: false
+          
+       
+  - stage: File_Operations
+    displayName: 'File Operations'
+    dependsOn: ['Maven_Package']
+    jobs:
+      - job: copy_files
+        steps:
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: '**/*.jar'
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+              CleanTargetFolder: true
+              OverWrite: true
+              preserveTimestamp: true
+          - script: 'ls -R $(Build.SourcesDirectory)'
+            displayName: 'Verify JAR Files Source'
+          - script: 'ls -al $(Build.ArtifactStagingDirectory)'
+            displayName: 'Verify JAR Files Destination'
+        
+          - task: CopyFiles@2
+            inputs:
+              SourceFolder: '$(Build.SourcesDirectory)'
+              Contents: '**/deployment-service.yaml'
+              TargetFolder: '$(Build.ArtifactStagingDirectory)'
+              OverWrite: true
+              preserveTimestamp: true
+          - script: 'ls -R $(Build.SourcesDirectory)'
+            displayName: 'Verify Manifest Source'
+          - script: 'ls -al $(Build.ArtifactStagingDirectory)'
+            displayName: 'Verify Manifest Destination'
+          - script: "if [ -f $(Build.ArtifactStagingDirectory)/deployment-service.yaml ]; then sed -i 's/{{Image_Tag}}/$(Build.BuildId)/g' $(Build.ArtifactStagingDirectory)/deployment-service.yaml; else echo 'File not found!'; exit 1; fi"
+                    
+          - task: PublishBuildArtifacts@1
+            inputs:
+              PathtoPublish: '$(Build.ArtifactStagingDirectory)'
+              ArtifactName: 'drop'
+              publishLocation: 'Container'
+
+  - stage: sonar_prepare_analysis_config
+    displayName: 'Sonar Analysis Config'
+    jobs:
+      - job: sonar_prepare_analysis_config
+        steps:
+          - task: SonarQubePrepare@7
+            inputs:
+              SonarQube: 'Sonarqube'
+              scannerMode: 'cli'
+              configMode: 'manual'
+              cliProjectKey: 'Boardgame'
+              cliProjectName: 'Boardgame'
+              cliSources: '.'
+              extraProperties: |
+               sonar.java.binaries=.
+          
+          - task: SonarQubeAnalyze@7
+            inputs:
+              jdkversion: 'JAVA_HOME_17_X64'
+  
+  - stage: trivy_fs_scan
+    displayName: 'Trivy FS Scan'
+    jobs:
+      - job: trivy_fs_scan
+        steps:
+          - task: CmdLine@2
+            inputs:
+              script: 'trivy fs --format table -o trivy-fs-report.html .'
+  
+  - stage: Build_and_Push_Image
+    displayName: 'Build_and_Push_Image'
+    jobs:
+      - job: build_and_push_image
+        steps:
+          - task: DownloadBuildArtifacts@0
+            inputs:
+              ArtifactName: 'drop'
+              downloadPath: '$(Pipeline.Workspace)/drop'
+            displayName: 'Download JAR for Docker build'
+          - task: CmdLine@2
+            displayName: 'Verify JAR file before Docker build'
+            inputs:
+              script: ls -l $(Pipeline.Workspace)/drop/
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'docker-conn'
+              repository: 'docknik19/project1'
+              command: 'buildAndPush'
+              Dockerfile: '**/Dockerfile'
+  
+  - stage: trivy_image_scan
+    displayName: 'Trivy Image Scan'
+    dependsOn: ['Build_and_Push_Image']
+    jobs:
+      - job: trivy_image_scan
+        steps:
+          - task: CmdLine@2
+            inputs:
+              script: 'trivy image --format table -o trivy-image-report.html docknik19/project1:$(Build.BuildId)'

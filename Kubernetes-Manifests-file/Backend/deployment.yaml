@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
         - name: backend
-          image: docknik19/3-tier-webapp:1
+          image: docknik19/webapp-backend:1
           imagePullPolicy: Always
           env:
             - name: MONGO_CONN_STR
