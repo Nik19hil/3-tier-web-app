@@ -1,11 +1,19 @@
 trigger:
   branches:
-    include:
-      - main
+    include: ['none']
+      
+pool:
+  name: 'Agent-1'
+  demands:
+    - agent.name -equals agent1
+    - npm
+    - node.js
+    - kubectl
+    - java
 
 variables:
-  JAVA_HOME: $(JAVA_HOME_11_X64)
-  NODE_JS_VERSION: '16.x'
+  #JAVA_HOME: $(JAVA_HOME_11_X64)
+  #NODE_JS_VERSION: '16.x'
   #SONAR_SCANNER_HOME: $(Agent.ToolsDirectory)/sonar-scanner
   #AWS_DEFAULT_REGION: 'us-east-1'
   dockerRegistryServiceConnection: 'MyDockerHub'
