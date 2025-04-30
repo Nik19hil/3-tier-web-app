@@ -105,7 +105,7 @@ stages:
                 docker system prune -f
                 docker container prune -f
                 docker build -t $(DOCKER_USER_NAME)/$(DOCKER_REPO_NAME):$(Build.BuildId) .
-                workingDirectory: 'Application-Code/backend'
+                workingDirectory: '$(System.DefaultWorkingDirectory)'
 
   - stage: DockerHubPush
     jobs:
