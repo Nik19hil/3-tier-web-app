@@ -1,0 +1,65 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backend
+  namespace: web-app
+  labels:
+    role: api
+    env: test
+spec:
+  replicas: 3
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxSurge: 1
+      maxUnavailable: 25%
+  selector:
+    matchLabels:
+      role: api
+  template:
+    metadata:
+      labels:
+        role: api
+    spec:
+      containers:
+        - name: backend
+          image: docknik19/webapp-backend:2
+          imagePullPolicy: Always
+          env:
+            - name: MONGO_CONN_STR
+              value: mongodb://mongodb-svc:27017/todo?directConnection=true
+            - name: MONGO_USERNAME
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: username
+            - name: MONGO_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: app-secret
+                  key: password
+          ports:
+            - containerPort: 3500
+                livenessProbe:
+                  httpGet:
+                    path: /healthz
+                    port: 3500
+                  initialDelaySeconds: 2
+                  periodSeconds: 5
+                readinessProbe:
+                  httpGet:
+                     path: /ready
+                     port: 3500
+                  initialDelaySeconds: 5
+                  periodSeconds: 5
+                  successThreshold: 1
+                startupProbe:
+                  httpGet:
+                    path: /started
+                    port: 3500
+                  initialDelaySeconds: 0
+                  periodSeconds: 10
+                  failureThreshold: 30
+
+
+
