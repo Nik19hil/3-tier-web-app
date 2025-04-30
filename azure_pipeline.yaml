@@ -1,108 +1,134 @@
 trigger:
   branches:
-    include: ['none']
+    include:
+      - main
 
-pool:
-  name: 'Agent-1'
-  demands:
-    - agent.name -equals agent1
-    - npm
-    - node.js
-    - kubectl
-    
 variables:
+  JAVA_HOME: $(JAVA_HOME_11_X64)
+  NODE_JS_VERSION: '16.x'
+  #SONAR_SCANNER_HOME: $(Agent.ToolsDirectory)/sonar-scanner
+  #AWS_DEFAULT_REGION: 'us-east-1'
   dockerRegistryServiceConnection: 'MyDockerHub'
-  dockerRegistrybackend: 'webapp-backend'
-  dockerRegistryfrontend: 'webapp-frontend'
-  imageFrontend: 'webapp-frontend'
-  imageBackend: 'webapp-backend'
+  githubServiceConnection: 'GitHub'
+  GIT_REPO_NAME: '3-tier-web-app'
+  GIT_USER_NAME: 'Nik19hil'
+  DOCKER_USER_NAME: 'docknik19'
+  DOCKER_REPO_NAME: 'webapp-backend'
 
 stages:
-# 1. Dectect changes in Code Repo
-- stage: DetectChanges
-  jobs:
-  - job: Detect
-    steps:
-    - checkout: self
-    - script: |
-        git fetch origin master
-        CHANGED_FILES=$(git diff --name-only origin/master)
+  - stage: CleanWorkspace
+    jobs:
+      - job: Clean
+        steps:
+          - checkout: none
+          - script: |
+              echo "Cleaning workspace"
+              sudo rm -rf *
+            displayName: 'Clean workspace'
 
-        echo "Changed files:"
-        echo "$CHANGED_FILES"
+  - stage: CheckoutCode
+    jobs:
+      - job: Checkout
+        steps:
+          - checkout: self
 
-        if echo "$CHANGED_FILES" | grep ^frontend/; then
-          echo "##vso[task.setvariable variable=ChangedFrontend]true"
-        fi
-        if echo "$CHANGED_FILES" | grep ^backend/; then
-          echo "##vso[task.setvariable variable=ChangedBackend]true"
-        fi
-      displayName: Detect changed services    
+#  - stage: SonarQubeAnalysis
+#    jobs:
+#      - job: Sonar
+#        steps:
+#          - task: SonarQubePrepare@5
+#            inputs:
+#              SonarQube: 'sonar-server'
+#              scannerMode: 'CLI'
+#              configMode: 'manual'
+#              cliProjectKey: 'three-tier-backend'
+#              cliProjectName: 'three-tier-backend'
+#              extraProperties: |
+#                sonar.sources=.
 
-# 2. Install Dependencies & Test
-- stage: BuildAndTest
-  jobs:
-  - job: InstallAndTest
-    steps:
-    - task: NodeTool@0
-      inputs:
-        versionSpec: '18.x'
-      displayName: 'Install Node.js'
+#          - script: |
+#              $(SONAR_SCANNER_HOME)/bin/sonar-scanner
+#            workingDirectory: 'Application-Code/backend'
+#            displayName: 'Run Sonar Scanner'
 
-    - script: |
-        cd Application-Code/frontend
-        npm install
-        npm run test
-      displayName: 'Install & Test Frontend'
+#  - stage: QualityGate
+#    jobs:
+#      - job: Gate
+#        steps:
+#          - task: SonarQubeAnalyze@5
+#            inputs:
+#              SonarQube: 'sonar-server'
+#              waitForQualityGate: true
+#              failOnQualityGateFailure: false
 
-    - script: |
-        cd Application-Code/backend
-        npm install
-        npm run test
-      displayName: 'Install & Test Backend'
+#  - stage: DependencyCheck
+#    jobs:
+#      - job: OWASP
+#        steps:
+#          - task: dependency-check-build-task@6
+#            inputs:
+#              projectName: 'three-tier-backend'
+#              scanPath: 'Application-Code/backend'
+#              format: 'XML'
+#              arguments: '--disableYarnAudit --disableNodeAudit'
+#          - task: PublishBuildArtifacts@1
+#            inputs:
+#              pathToPublish: 'dependency-check-report.xml'
+#              artifactName: 'owasp-report'
 
+#  - stage: trivy_fs_scan
+#    displayName: 'Trivy FS Scan'
+#    jobs:
+#      - job: trivy_fs_scan
+#        steps:
+#          - task: CmdLine@2
+#            inputs:
+#              script: 'trivy fs --format table -o trivy-fs-report.html .'
 
+  - stage: DockerBuild
+    jobs:
+      - job: Docker
+        steps:
+          - task: DockerInstaller@0
+          - task: Bash@3
+            inputs:
+              targetType: 'inline'
+              script: |
+                docker system prune -f
+                docker container prune -f
+                docker build -t $(DOCKER_USER_NAME)/$(DOCKER_REPO_NAME):$(Build.BuildId) .
+                workingDirectory: 'Application-Code/backend'
 
-#- stage: File_Operations
-#  displayName: 'File Operations'
-# dependsOn: ['Maven_Package']
-#  jobs:
-#    - job: copy_files
-#      steps:
-#      - task: CopyFiles@2
-#        inputs:
-#         SourceFolder: 'Kubernetes-Manifests-file/'
-#         Contents: '**'
-#         TargetFolder: '$(Build.ArtifactStagingDirectory)'
-#         OverWrite: true
-#      - script: "if [ -f $(Build.ArtifactStagingDirectory)/deploymentbackend.yaml ]; then sed -i 's/{{Image_Tag}}/$(Build.BuildId)/g' $(Build.ArtifactStagingDirectory)/deploymentbackend.yaml; else echo 'File not found!'; exit 1; fi"
+  - stage: DockerHubPush
+    jobs:
+      - job: PushToDockerHub
+        steps:
+          - task: Docker@2
+            inputs:
+              containerRegistry: 'MyDockerHub'
+              repository: 'webapp-backend'
+              command: 'buildAndPush'
+              Dockerfile: 'Application-Code/backend/Dockerfile'
+              tags: $(Build.BuildId)
 
-# 3. Build & Push Docker Images
-- stage: BuildAndPush
-  dependsOn: DetectChanges
-  jobs:
-   - job: DockerBuildPush
-     condition: eq(variables['ChangedFrontend'], 'true')
-     steps:
-     - task: Docker@2
-       displayName: 'Build Frontend Docker Image'
-       inputs:
-        command: buildAndPush
-        repository: $(imageFrontend)
-        dockerfile: Application-Code/frontend/Dockerfile
-        containerRegistry: $(dockerRegistryServiceConnection)
-        tags: |
-          latest
-    
-   - job: BuildBackend
-     condition: eq(variables['ChangedBackend'], 'true')
-     steps:
-     - task: Docker@2
-       displayName: 'Build Backend Docker Image'
-       inputs:
-        command: buildAndPush
-        repository: $(imageBackend)
-        dockerfile: Application-Code/backend/Dockerfile
-        containerRegistry: $(dockerRegistryServiceConnection)
-        tags: |
-          latest
+#  - stage: TrivyImageScan
+#    jobs:
+#      - job: TrivyImage
+#        steps:
+#          - script: |
+#              trivy image $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_DEFAULT_REGION).amazonaws.com/$(AWS_ECR_REPO_NAME):$(Build.BuildId) > trivyimage.txt
+
+  - stage: UpdateDeployment
+    jobs:
+      - job: GitUpdate
+        steps:
+          - checkout: self
+          - script: |
+              cd Kubernetes-Manifests-file/Backend
+              git config user.email "nikhil.gavankar19@gmail.com"
+              git config user.name "$(GIT_USER_NAME)"
+              "if [ -f deployment-backend.yaml ]; then sed -i 's/{{Imagetag}}/$(Build.BuildId)/g' deployment-backend.yaml; else echo 'File not found!'; exit 1; fi"
+              git add deployment-backend.yaml
+              git commit -m "Update deployment Image to version $(Build.BuildId)"
+              git push https://github.com/$(GIT_USER_NAME)/$(GIT_REPO_NAME).git HEAD:master
+            
