@@ -104,7 +104,7 @@ stages:
 #              script: |
 #                docker system prune -f
 #                docker container prune -f
-#                docker build -t $(DOCKER_USER_NAME)/$(DOCKER_REPO_NAME):$(Build.BuildVersion) .
+#                docker build -t $(DOCKER_USER_NAME)/$(DOCKER_REPO_NAME):$(buildVersion) .
 #                workingDirectory: '$(System.DefaultWorkingDirectory)'
 
   - stage: DockerHubPush
@@ -117,14 +117,14 @@ stages:
               repository: 'docknik19/webapp-backend'
               command: 'buildAndPush'
               Dockerfile: 'Application-Code/backend/Dockerfile'
-              tags: $(Build.BuildVersion)
+              tags: $(buildVersion)
 
 #  - stage: TrivyImageScan
 #    jobs:
 #      - job: TrivyImage
 #        steps:
 #          - script: |
-#              trivy image $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_DEFAULT_REGION).amazonaws.com/$(AWS_ECR_REPO_NAME):$(Build.BuildVersion) > trivyimage.txt
+#              trivy image $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_DEFAULT_REGION).amazonaws.com/$(AWS_ECR_REPO_NAME):$(buildVersion) > trivyimage.txt
 
   - stage: UpdateDeployment
     jobs:
@@ -135,8 +135,8 @@ stages:
               cd Kubernetes-Manifests-file/Backend
               git config user.email "nikhil.gavankar19@gmail.com"
               git config user.name "$(GIT_USER_NAME)"
-              "if [ -f deployment-backend.yaml ]; then sed -i 's/{{Imagetag}}/$(Build.BuildVersion)/g' deployment-backend.yaml; else echo 'File not found!'; exit 1; fi"
+              "if [ -f deployment-backend.yaml ]; then sed -i 's/{{Imagetag}}/$(buildVersion)/g' deployment-backend.yaml; else echo 'File not found!'; exit 1; fi"
               git add deployment-backend.yaml
-              git commit -m "Update deployment Image to version $(Build.BuildVersion)"
+              git commit -m "Update deployment Image to version $(buildVersion)"
               git push https://github.com/$(GIT_USER_NAME)/$(GIT_REPO_NAME).git HEAD:master
             
