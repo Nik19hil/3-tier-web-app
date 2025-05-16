@@ -12,10 +12,6 @@ pool:
     - java
 
 variables:
-  #JAVA_HOME: $(JAVA_HOME_11_X64)
-  #NODE_JS_VERSION: '16.x'
-  #SONAR_SCANNER_HOME: $(Agent.ToolsDirectory)/sonar-scanner
-  #AWS_DEFAULT_REGION: 'us-east-1'
   dockerRegistryServiceConnection: 'MyDockerHub'
   githubServiceConnection: 'GitHub'
   GIT_REPO_NAME: '3-tier-web-app'
@@ -41,73 +37,6 @@ stages:
         steps:
           - checkout: self
 
-#  - stage: SonarQubeAnalysis
-#    jobs:
-#      - job: Sonar
-#        steps:
-#          - task: SonarQubePrepare@5
-#            inputs:
-#              SonarQube: 'sonar-server'
-#              scannerMode: 'CLI'
-#              configMode: 'manual'
-#              cliProjectKey: 'three-tier-backend'
-#              cliProjectName: 'three-tier-backend'
-#              extraProperties: |
-#                sonar.sources=.
-
-#          - script: |
-#              $(SONAR_SCANNER_HOME)/bin/sonar-scanner
-#            workingDirectory: 'Application-Code/backend'
-#            displayName: 'Run Sonar Scanner'
-
-#  - stage: QualityGate
-#    jobs:
-#      - job: Gate
-#        steps:
-#          - task: SonarQubeAnalyze@5
-#            inputs:
-#              SonarQube: 'sonar-server'
-#              waitForQualityGate: true
-#              failOnQualityGateFailure: false
-
-#  - stage: DependencyCheck
-#    jobs:
-#      - job: OWASP
-#        steps:
-#          - task: dependency-check-build-task@6
-#            inputs:
-#              projectName: 'three-tier-backend'
-#              scanPath: 'Application-Code/backend'
-#              format: 'XML'
-#              arguments: '--disableYarnAudit --disableNodeAudit'
-#          - task: PublishBuildArtifacts@1
-#            inputs:
-#              pathToPublish: 'dependency-check-report.xml'
-#              artifactName: 'owasp-report'
-
-#  - stage: trivy_fs_scan
-#    displayName: 'Trivy FS Scan'
-#    jobs:
-#      - job: trivy_fs_scan
-#        steps:
-#          - task: CmdLine@2
-#            inputs:
-#              script: 'trivy fs --format table -o trivy-fs-report.html .'
-
-#  - stage: DockerBuild
-#    jobs:
-#      - job: Docker
-#        steps:
-#          - task: DockerInstaller@0
-#          - task: Bash@3
-#            inputs:
-#              targetType: 'inline'
-#              script: |
-#                docker system prune -f
-#                docker container prune -f
-#                docker build -t $(DOCKER_USER_NAME)/$(DOCKER_REPO_NAME):$(Build.BuildId) .
-#                workingDirectory: '$(System.DefaultWorkingDirectory)'
-
   - stage: DockerHubPush
     jobs:
       - job: PushToDockerHub
@@ -119,13 +48,6 @@ stages:
               command: 'buildAndPush'
               Dockerfile: 'Application-Code/backend/Dockerfile'
               tags: $(IMAGE_TAG)
-
-#  - stage: TrivyImageScan
-#    jobs:
-#      - job: TrivyImage
-#        steps:
-#          - script: |
-#              trivy image $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_DEFAULT_REGION).amazonaws.com/$(AWS_ECR_REPO_NAME):$(Build.BuildId) > trivyimage.txt
 
   - stage: DeployToKubernetes
     jobs:
@@ -145,6 +67,4 @@ stages:
                 connectionType: 'kubernetesServiceConnection'
                 kubernetesServiceConnection: 'AKSCluster'
                 namespace: 'web-app'
-                manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'
-            # kubectl apply -f Kubernetes-Manifests-file/Backend/deployment-backend.yaml
-            
+                manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'            

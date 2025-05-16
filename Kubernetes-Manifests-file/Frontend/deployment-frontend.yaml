@@ -23,7 +23,7 @@ spec:
     spec:
       containers:
       - name: frontend
-        image: docknik19/webapp-frontend:2
+        image: docknik19/webapp-frontend:{Imagetag}
         imagePullPolicy: Always
         env:
           name: REACT_APP_BACKEND_URL
