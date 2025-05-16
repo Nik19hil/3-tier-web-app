@@ -28,29 +28,40 @@ stages:
               sudo rm -rf *
         displayName: 'Clean workspace'
     
-  - stage: CheckoutCode
-    jobs:
-      - job: Checkout
-        steps:
-          - checkout: self
-            persistCredentials: true
-            fetchDepth: 0
-
   - stage: DetectChanges
     displayName: 'Detect Changed Services'
     jobs:
       - job: SetFlags
         displayName: 'Check for changes using git'
         steps:
+         - checkout: self
+           persistCredentials: true
+           fetchDepth: 0
          - script: |
               echo "## Detecting frontend changes..."
-              git diff --name-only HEAD^ HEAD | grep 'Application-Code/frontend/' && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true"
+              git diff --quiet HEAD^ HEAD --frontend/ 
+              if [$? -ne 0]; then 
+                echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true"
+              else
+                echo "##vso[task.setvariable variable=CHANGED_FRONTEND]false"
+              fi
             
               echo "## Detecting backend changes..."
-              git diff --name-only HEAD^ HEAD | grep 'Application-Code/backend/' && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true"
-            
+              git diff --quiet HEAD^ HEAD --backend/ 
+              if [$? -ne 0]; then 
+                echo "##vso[task.setvariable variable=CHANGED_BACKEND]true"
+              else
+                echo "##vso[task.setvariable variable=CHANGED_BACKEND]false"
+              fi
+              
               echo "## Detecting database changes..."
-              git diff --name-only HEAD^ HEAD | grep 'Application-Code/database/' && echo "##vso[task.setvariable variable=CHANGED_DB]true"
+              git diff --quiet HEAD^ HEAD --database/ 
+              if [$? -ne 0]; then 
+                echo "##vso[task.setvariable variable=CHANGED_DB]true"
+              else
+                echo "##vso[task.setvariable variable=CHANGED_DB]false"
+              fi
+              
            displayName: 'Set change detection flags'
 
 # FRONTEND STAGE
