@@ -2,8 +2,9 @@ trigger:
   branches:
     include: ['none']
       
+
 pool:
-  name: 'Agent-1'
+  vmImage: 'Agent-1'
   demands:
     - agent.name -equals agent1
     - npm
@@ -12,13 +13,9 @@ pool:
     - java
 
 variables:
-  dockerRegistryServiceConnection: 'MyDockerHub'
-  githubServiceConnection: 'GitHub'
-  GIT_REPO_NAME: '3-tier-web-app'
-  GIT_USER_NAME: 'Nik19hil'
-  DOCKER_USER_NAME: 'docknik19'
-  DOCKER_REPO_NAME: 'webapp-backend'
+  DOCKER_REGISTRY: 'docknik19'
   IMAGE_TAG: $(Build.BuildId)
+  K8S_NAMESPACE: 'web-app'
 
 stages:
   - stage: CleanWorkspace
@@ -29,42 +26,107 @@ stages:
           - script: |
               echo "Cleaning workspace"
               sudo rm -rf *
-            displayName: 'Clean workspace'
-
+        displayName: 'Clean workspace'
+    
   - stage: CheckoutCode
     jobs:
       - job: Checkout
         steps:
           - checkout: self
+            persistCredentials: true
+            fetchDepth: 0
 
-  - stage: DockerHubPush
+  - stage: DetectChanges
+    displayName: 'Detect Changed Services'
     jobs:
-      - job: PushToDockerHub
+      - job: SetFlags
+        displayName: 'Check for changes using git'
+        steps:
+         - script: |
+              echo "## Detecting frontend changes..."
+              git diff --name-only HEAD^ HEAD | grep 'Application-Code/frontend/' && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true"
+            
+              echo "## Detecting backend changes..."
+              git diff --name-only HEAD^ HEAD | grep 'Application-Code/backend/' && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true"
+            
+              echo "## Detecting database changes..."
+              git diff --name-only HEAD^ HEAD | grep 'Application-Code/database/' && echo "##vso[task.setvariable variable=CHANGED_DB]true"
+           displayName: 'Set change detection flags'
+
+# FRONTEND STAGE
+  - stage: BuildAndDeployFrontend
+    displayName: 'Build and Deploy Frontend'
+    condition: eq(variables['CHANGED_FRONTEND'], 'true')
+    jobs:
+      - job: Frontend
         steps:
           - task: Docker@2
             inputs:
               containerRegistry: 'MyDockerHub'
-              repository: 'docknik19/webapp-backend'
+              repository: '$(DOCKER_REGISTRY)/webapp-frontend'
               command: 'buildAndPush'
-              Dockerfile: 'Application-Code/backend/Dockerfile'
+              Dockerfile: 'Application-Code/frontend/Dockerfile'
               tags: $(IMAGE_TAG)
+            displayName: 'Build and Push Frontend Image'
 
-  - stage: DeployToKubernetes
+          - script: |
+              sed -i "s|{{Imagetag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests/frontend/deployment.yaml
+            displayName: 'Update frontend manifest'
+
+          - task: KubernetesManifest@1
+            inputs:
+              action: deploy
+              kubernetesServiceConnection: 'AKSCluster'
+              namespace: $(K8S_NAMESPACE)
+              manifests: |
+                Kubernetes-Manifests/frontend/deployment.yaml
+            displayName: 'Deploy Frontend to AKS'
+
+# BACKEND STAGE
+  - stage: BuildAndDeployBackend
+    displayName: 'Build and Deploy Backend'
+    condition: eq(variables['CHANGED_BACKEND'], 'true')
     jobs:
-      - job: DeployBackend
+      - job: Backend
+        steps:
+         - task: Docker@2
+           inputs:
+             containerRegistry: 'MyDockerHub'
+             repository: '$(DOCKER_REGISTRY)/webapp-backend'
+             command: 'buildAndPush'
+             Dockerfile: 'Application-Code/backend/Dockerfile'
+             tags: $(IMAGE_TAG)
+           displayName: 'Build and Push Backend Image'
+
+         - script: |
+             sed -i "s|{{ImageTag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests/backend/deployment.yaml
+           displayName: 'Update backend manifest'
+
+         - task: KubernetesManifest@1
+           inputs:
+              action: deploy
+              kubernetesServiceConnection: 'AKSCluster'
+              namespace: $(K8S_NAMESPACE)
+              manifests: |
+                Kubernetes-Manifests/backend/deployment.yaml
+           displayName: 'Deploy Backend to AKS'
+
+# DATABASE STAGE
+  - stage: DeployDatabase
+    displayName: 'Deploy Database Changes'
+    condition: eq(variables['CHANGED_DB'], 'true')
+    jobs:
+      - job: Database
         steps:
           - script: |
-              echo "Updating image tag in deployment file"
-              cd Kubernetes-Manifests-file/Backend
-              sed -i 's|{Imagetag}|$(IMAGE_TAG)|g' deployment-backend.yaml
-            displayName: 'Update image tag in local YAML'
-          - script: |
-              echo "Applying deployment to Kubernetes cluster"
+              echo "Applying DB manifests..."
+            displayName: 'Update Database Manifests'
+
           - task: KubernetesManifest@1
-            displayName: 'Deploy backend to Kubernetes'
             inputs:
-                action: 'deploy'
-                connectionType: 'kubernetesServiceConnection'
-                kubernetesServiceConnection: 'AKSCluster'
-                namespace: 'web-app'
-                manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'            
+              action: deploy
+              kubernetesServiceConnection: 'AKSCluster'
+              namespace: $(K8S_NAMESPACE)
+              manifests: |
+                Kubernetes-Manifests/database/*
+            displayName: 'Deploy DB to AKS'
