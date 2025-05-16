@@ -40,16 +40,17 @@ stages:
            fetchDepth: 0
          - script: |
              echo "Fetching latest main branch..."
-             git fetch origin master --depth=2
-             git checkout master
+             git fetch origin master --deepen=5
+             git checkout origin/master
+             git checkout -b temp_branch
              git log -2 --oneline
              echo "Detecting changed files..."
              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
              echo "$CHANGED_FILES"
 
-             echo "$CHANGED_FILES" | grep -q "^frontend/" && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true" || echo "##vso[task.setvariable variable=FrontendChanged]false"
-             echo "$CHANGED_FILES" | grep -q "^backend/" && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true" || echo "##vso[task.setvariable variable=BackendChanged]false"
-             echo "$CHANGED_FILES" | grep -q "^database/" && echo "##vso[task.setvariable variable=CHANGED_DB]true" || echo "##vso[task.setvariable variable=DatabaseChanged]false"
+             echo "$CHANGED_FILES" | grep -q "^*/frontend/" && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true" || echo "##vso[task.setvariable variable=FrontendChanged]false"
+             echo "$CHANGED_FILES" | grep -q "^*/backend/" && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true" || echo "##vso[task.setvariable variable=BackendChanged]false"
+             echo "$CHANGED_FILES" | grep -q "^*/database/" && echo "##vso[task.setvariable variable=CHANGED_DB]true" || echo "##vso[task.setvariable variable=DatabaseChanged]false"
            displayName: 'Detect folder changes'
 
 # FRONTEND STAGE
