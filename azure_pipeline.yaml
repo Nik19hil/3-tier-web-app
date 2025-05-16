@@ -43,7 +43,7 @@ stages:
              git fetch origin master --depth=2
 
              echo "Detecting changed files..."
-             CHANGED_FILES=$(git diff --name-only origin/master HEAD)
+             CHANGED_FILES=$(git diff --name-only origin/master HEAD HEAD~1)
              echo "$CHANGED_FILES"
 
              echo "$CHANGED_FILES" | grep -q "^frontend/" && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true" || echo "##vso[task.setvariable variable=FrontendChanged]false"
