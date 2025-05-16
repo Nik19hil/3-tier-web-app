@@ -30,7 +30,7 @@ app.get('/ready', (req, res) => {
     if (isDbConnected) {
         res.status(200).send('Ready');
     } else {
-        res.status(503).send('Not Ready');
+        res.status(503).send('Not Yet Ready');
     }
 });
 
