@@ -1,6 +1,7 @@
 trigger:
   branches:
-    include: ['none']
+    include:
+      - main
       
 
 pool:
