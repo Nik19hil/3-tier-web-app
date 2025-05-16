@@ -48,9 +48,9 @@ stages:
              CHANGED_FILES=$(git diff --name-only HEAD~1 HEAD)
              echo "$CHANGED_FILES"
 
-             echo "$CHANGED_FILES" | grep -q "^*/frontend/" && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true" || echo "##vso[task.setvariable variable=FrontendChanged]false"
-             echo "$CHANGED_FILES" | grep -q "^*/backend/" && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true" || echo "##vso[task.setvariable variable=BackendChanged]false"
-             echo "$CHANGED_FILES" | grep -q "^*/database/" && echo "##vso[task.setvariable variable=CHANGED_DB]true" || echo "##vso[task.setvariable variable=DatabaseChanged]false"
+             echo "$CHANGED_FILES" | grep -q "^*/frontend/" && echo "##vso[task.setvariable variable=CHANGED_FRONTEND]true" || echo "##vso[task.setvariable variable=CHANGED_FRONTEND]false"
+             echo "$CHANGED_FILES" | grep -q "^*/backend/" && echo "##vso[task.setvariable variable=CHANGED_BACKEND]true" || echo "##vso[task.setvariable variable=CHANGED_BACKEND]false"
+             echo "$CHANGED_FILES" | grep -q "^*/database/" && echo "##vso[task.setvariable variable=CHANGED_DB]true" || echo "##vso[task.setvariable variable=CHANGED_DB]false"
            displayName: 'Detect folder changes'
 
 # FRONTEND STAGE
@@ -70,7 +70,7 @@ stages:
             displayName: 'Build and Push Frontend Image'
 
           - script: |
-              sed -i "s|{{Imagetag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests/frontend/deployment.yaml
+              sed -i "s|{{Imagetag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests-file/Frontend/deployment-frontend.yaml
             displayName: 'Update frontend manifest'
 
           - task: KubernetesManifest@1
@@ -79,7 +79,7 @@ stages:
               kubernetesServiceConnection: 'AKSCluster'
               namespace: $(K8S_NAMESPACE)
               manifests: |
-                Kubernetes-Manifests/frontend/deployment.yaml
+                Kubernetes-Manifests-file/Frontend/deployment-frontend.yaml
             displayName: 'Deploy Frontend to AKS'
 
 # BACKEND STAGE
@@ -99,7 +99,7 @@ stages:
            displayName: 'Build and Push Backend Image'
 
          - script: |
-             sed -i "s|{{ImageTag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests/backend/deployment.yaml
+             sed -i "s|{{ImageTag}}|$(IMAGE_TAG)|g" Kubernetes-Manifests-file/Backend/deployment-backend.yaml
            displayName: 'Update backend manifest'
 
          - task: KubernetesManifest@1
@@ -108,7 +108,7 @@ stages:
               kubernetesServiceConnection: 'AKSCluster'
               namespace: $(K8S_NAMESPACE)
               manifests: |
-                Kubernetes-Manifests/backend/deployment.yaml
+                Kubernetes-Manifests-file/Backend/deployment-backend.yaml
            displayName: 'Deploy Backend to AKS'
 
 # DATABASE STAGE
@@ -128,5 +128,5 @@ stages:
               kubernetesServiceConnection: 'AKSCluster'
               namespace: $(K8S_NAMESPACE)
               manifests: |
-                Kubernetes-Manifests/database/*
+                Kubernetes-Manifests-file/Database/*
             displayName: 'Deploy DB to AKS'
