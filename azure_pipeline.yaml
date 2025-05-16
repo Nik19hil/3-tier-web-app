@@ -144,7 +144,7 @@ stages:
                 action: 'deploy'
                 connectionType: 'kubernetesServiceConnection'
                 kubernetesServiceConnection: 'AKSCluster'
-                namespace: 'default'
+                namespace: 'web-app'
                 manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'
             # kubectl apply -f Kubernetes-Manifests-file/Backend/deployment-backend.yaml
             
