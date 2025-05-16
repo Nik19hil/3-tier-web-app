@@ -138,13 +138,13 @@ stages:
             displayName: 'Update image tag in local YAML'
           - script: |
               echo "Applying deployment to Kubernetes cluster"
-              - task: KubernetesManifest@1
-                displayName: 'Deploy backend to Kubernetes'
-                inputs:
-                  action: 'deploy'
-                  connectionType: 'kubernetesServiceConnection'
-                  kubernetesServiceConnection: 'AKSCluster'
-                  namespace: 'default'
-                  manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'
+          - task: KubernetesManifest@1
+            displayName: 'Deploy backend to Kubernetes'
+            inputs:
+                action: 'deploy'
+                connectionType: 'kubernetesServiceConnection'
+                kubernetesServiceConnection: 'AKSCluster'
+                namespace: 'default'
+                manifests: 'Kubernetes-Manifests-file/Backend/deployment-backend.yaml'
             # kubectl apply -f Kubernetes-Manifests-file/Backend/deployment-backend.yaml
             
