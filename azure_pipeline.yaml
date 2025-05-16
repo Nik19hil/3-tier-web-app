@@ -4,7 +4,7 @@ trigger:
       
 
 pool:
-  vmImage: 'Agent-1'
+  name: 'Agent-1'
   demands:
     - agent.name -equals agent1
     - npm
