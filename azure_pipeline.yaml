@@ -40,7 +40,7 @@ stages:
            fetchDepth: 0
          - script: |
              echo "Fetching latest main branch..."
-             git fetch origin master
+             git fetch origin master --depth=2
 
              echo "Detecting changed files..."
              CHANGED_FILES=$(git diff --name-only origin/master HEAD)
