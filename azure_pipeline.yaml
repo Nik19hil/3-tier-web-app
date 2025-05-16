@@ -135,8 +135,8 @@ stages:
               echo "Updating image tag in deployment file"
               cd Kubernetes-Manifests-file/Backend
               sed -i 's|{{ImageTag}}|$(IMAGE_TAG)|g' deployment-backend.yaml
-              displayName: 'Update image tag in local YAML'
+            displayName: 'Update image tag in local YAML'
           - script: |
               echo "Applying deployment to Kubernetes cluster"
               kubectl apply -f Kubernetes-Manifests-file/Backend/deployment-backend.yaml
-              displayName: 'Deploy backend to Kubernetes'
+            displayName: 'Deploy backend to Kubernetes'
